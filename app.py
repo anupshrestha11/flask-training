@@ -31,10 +31,18 @@ def add_new_todo():
 def delete_todo(id):
     for i in range(len(todos)):
         if todos[i]["id"] == int(id):
-            print(todos[i])
             del todos[i]
             break
     return jsonify(todos)
+
+@app.route("/todos/<id>", methods=["PUT"])
+def update_todos(id):
+    for i in range(len(todos)):
+        if todos[i]["id"] == int(id):
+            todos[i]["title"] = request.json['title']
+            todos[i]["description"] = request.json['description']
+            todos[i]["status"] = request.json['status']
+            return todos[i]
 
 
 app.run(port=8080, debug=True)
