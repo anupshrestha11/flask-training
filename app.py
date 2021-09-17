@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from flask_pymongo import PyMongo
 
 todos = [{
     "id": 1,
@@ -9,40 +10,58 @@ todos = [{
 
 app = Flask(__name__)
 
+app.config["MONGO_URI"] = "mongodb://localhost:27017/flask_training"
+mongo = PyMongo(app)
+
 
 @app.route("/todos", methods=["GET"])
 def get_all_todos():
-    return jsonify(todos)
+    todos = mongo.db.todo
+    output = []
+    for todo in todos.find():
+        output.append({
+            'title': todo["title"],
+            'description': todo["description"],
+            "status": todo["status"]
+        })
+
+    return jsonify(output)
 
 
 @app.route("/todos", methods=["POST"])
 def add_new_todo():
-    new_todo = {
-        "id": 0 if len(todos) == 0 else todos[-1]["id"] + 1,
+    todo = mongo.db.todo
+    todo_id = todo.insert_one({
         "title": request.json['title'],
         "status": request.json['status'],
         "description": request.json['description']
+    })
+    new_todo = todo.find_one({"_id": todo_id})
+    output = {
+        'title': new_todo["title"],
+        'description': new_todo["description"],
+        "status": new_todo["status"]
     }
-    todos.append(new_todo)
-    return jsonify(new_todo)
+    return jsonify(output)
 
 
-@app.route("/todos/<id>", methods=["DELETE"])
-def delete_todo(id):
-    for i in range(len(todos)):
-        if todos[i]["id"] == int(id):
-            del todos[i]
-            break
-    return jsonify(todos)
+@app.route("/todos/<title>", methods=["DELETE"])
+def delete_todo(title):
+    todo = mongo.db.todo
+    todo.delete_one({"title": title})
+    return ""
 
-@app.route("/todos/<id>", methods=["PUT"])
-def update_todos(id):
-    for i in range(len(todos)):
-        if todos[i]["id"] == int(id):
-            todos[i]["title"] = request.json['title']
-            todos[i]["description"] = request.json['description']
-            todos[i]["status"] = request.json['status']
-            return todos[i]
+
+@app.route("/todos/<title>", methods=["PUT"])
+def update_todos(title):
+    todo = mongo.db.todo
+    todo_id = todo.update_one({"title": title}, {
+        "title": request.json['title'],
+        "status": request.json['status'],
+        "description": request.json['description']
+    })
+
+    return todo_id
 
 
 app.run(port=8080, debug=True)
