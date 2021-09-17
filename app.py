@@ -1,67 +1,56 @@
 from flask import Flask, jsonify, request
-from flask_pymongo import PyMongo
+from flask_mongoengine import MongoEngine
 
-todos = [{
-    "id": 1,
-    "title": "Clean PC",
-    "description": "removing dusts from the Pc an keep is shining",
-    "status": "in-complete",
-}]
+database_name = "flask_training"
 
 app = Flask(__name__)
+app.config['MONGODB_SETTINGS'] = {
+    "db": database_name
+}
 
-app.config["MONGO_URI"] = "mongodb://localhost:27017/flask_training"
-mongo = PyMongo(app)
+db = MongoEngine(app)
+
+
+class Todo(db.Document):
+    title = db.StringField()
+    description = db.StringField()
+    status = db.StringField()
 
 
 @app.route("/todos", methods=["GET"])
 def get_all_todos():
-    todos = mongo.db.todo
-    output = []
-    for todo in todos.find():
-        output.append({
-            'title': todo["title"],
-            'description': todo["description"],
-            "status": todo["status"]
-        })
-
-    return jsonify(output)
+    todos = Todo.objects()
+    return jsonify(todos)
 
 
 @app.route("/todos", methods=["POST"])
 def add_new_todo():
-    todo = mongo.db.todo
-    todo_id = todo.insert_one({
-        "title": request.json['title'],
-        "status": request.json['status'],
-        "description": request.json['description']
-    })
-    new_todo = todo.find_one({"_id": todo_id})
-    output = {
-        'title': new_todo["title"],
-        'description': new_todo["description"],
-        "status": new_todo["status"]
-    }
-    return jsonify(output)
+    new_todo = Todo(
+        title=request.json['title'],
+        status=request.json['status'],
+        description=request.json['description']
+    )
+    new_todo.save()
+    return jsonify(new_todo)
 
 
-@app.route("/todos/<title>", methods=["DELETE"])
-def delete_todo(title):
-    todo = mongo.db.todo
-    todo.delete_one({"title": title})
-    return ""
+@app.route("/todos/<id>", methods=["DELETE"])
+def delete_todo(id):
+    todo = Todo.objects.get_or_404(id=id)
+    todo.delete()
+    return jsonify(todo)
 
 
-@app.route("/todos/<title>", methods=["PUT"])
-def update_todos(title):
-    todo = mongo.db.todo
-    todo_id = todo.update_one({"title": title}, {
-        "title": request.json['title'],
-        "status": request.json['status'],
-        "description": request.json['description']
-    })
-
-    return todo_id
+@app.route("/todos/<id>", methods=["PUT"])
+def update_todos(id):
+    todo = Todo.objects.get_or_404(id=id)
+    todo.update(
+        title=request.json['title'],
+        description=request.json['description'],
+        status=request.json['status']
+    )
+    todo = Todo.objects.get_or_404(id=id)
+    return jsonify(todo)
 
 
 app.run(port=8080, debug=True)
