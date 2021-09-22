@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_mongoengine import MongoEngine
+from flask_restful import Resource, Api
 
 database_name = "flask_training"
 
@@ -7,6 +8,8 @@ app = Flask(__name__)
 app.config['MONGODB_SETTINGS'] = {
     "db": database_name
 }
+
+api = Api(app)
 
 db = MongoEngine(app)
 
@@ -17,40 +20,43 @@ class Todo(db.Document):
     status = db.StringField()
 
 
-@app.route("/todos", methods=["GET"])
-def get_all_todos():
-    todos = Todo.objects()
-    return jsonify(todos)
+class TodoController(Resource):
+    def get(self, todo_id):
+        todo = Todo.objects.get_or_404(id=todo_id)
+        return jsonify(todo)
+
+    def put(self, todo_id):
+        todo = Todo.objects.get_or_404(id=todo_id)
+        todo.update(
+            title=request.json['title'],
+            description=request.json['description'],
+            status=request.json['status']
+        )
+        todo = Todo.objects.get_or_404(id=todo_id)
+        return jsonify(todo)
+
+    def delete(self, todo_id):
+        todo = Todo.objects.get_or_404(id=todo_id)
+        todo.delete()
+        return jsonify(todo)
 
 
-@app.route("/todos", methods=["POST"])
-def add_new_todo():
-    new_todo = Todo(
-        title=request.json['title'],
-        status=request.json['status'],
-        description=request.json['description']
-    )
-    new_todo.save()
-    return jsonify(new_todo)
+class TodoListController(Resource):
+    def get(self):
+        return jsonify(Todo.objects())
+
+    def post(self):
+        new_todo = Todo(
+            title=request.json['title'],
+            status=request.json['status'],
+            description=request.json['description']
+        )
+        new_todo.save()
+        return jsonify(new_todo)
 
 
-@app.route("/todos/<id>", methods=["DELETE"])
-def delete_todo(id):
-    todo = Todo.objects.get_or_404(id=id)
-    todo.delete()
-    return jsonify(todo)
-
-
-@app.route("/todos/<id>", methods=["PUT"])
-def update_todos(id):
-    todo = Todo.objects.get_or_404(id=id)
-    todo.update(
-        title=request.json['title'],
-        description=request.json['description'],
-        status=request.json['status']
-    )
-    todo = Todo.objects.get_or_404(id=id)
-    return jsonify(todo)
+api.add_resource(TodoListController, "/todos")
+api.add_resource(TodoController, "/todos/<string:todo_id>")
 
 
 app.run(port=8080, debug=True)
